@@ -1,0 +1,37 @@
+# The name of the mod loader type to load - for regular FML @Mod mods it should be javafml
+modLoader="javafml"
+# A version range to match for said mod loader - for regular FML @Mod it will be the forge version
+# Forge for 1.19.2 is version 43
+loaderVersion="[43,)"
+# The license for your mod. This is mandatory and allows for easier comprehension of your redistributive properties.
+# Review your options at https://choosealicense.com/. All rights reserved is the default copyright stance, and is thus the default here.
+license="MIT"
+# A URL to refer people to when problems occur with this mod
+issueTrackerURL="https://your.issue.tracker/eliteinventorybackups"
+# If the mods defined in this file should show as separate resource packs
+showAsResourcePack=false
+
+[[mods]]
+  modId="eliteinventorybackups"
+  version="${version}"
+  displayName="Elite Inventory Backups"
+  displayURL="https://your.website/eliteinventorybackups"
+  credits="StrictGaming"
+  authors="EliteScouter"
+  description='''
+  Backs up player inventories and more with database support.
+  '''
+
+  [[dependencies.eliteinventorybackups]]
+    modId="forge"
+    mandatory=true
+    versionRange="[43,)"
+    ordering="NONE"
+    side="BOTH"
+
+  [[dependencies.eliteinventorybackups]]
+    modId="minecraft"
+    mandatory=true
+    versionRange="[1.19.2,1.20)"
+    ordering="NONE"
+    side="BOTH" 

@@ -1,0 +1,148 @@
+buildscript {
+    repositories {
+        mavenCentral()
+        maven { url = 'https://maven.minecraftforge.net/' }
+        maven { url = 'https://plugins.gradle.org/m2/' }
+    }
+    dependencies {
+        classpath group: 'net.minecraftforge.gradle', name: 'ForgeGradle', version: '5.1.+'
+    }
+}
+
+apply plugin: 'net.minecraftforge.gradle'
+apply plugin: 'java'
+apply plugin: 'maven-publish'
+
+group = 'com.eliteinventorybackups'
+version = '0.1.0'
+archivesBaseName = 'EliteInventoryBackups'
+
+// Set Java compatibility level
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
+
+// Ensure Java compatibility for all compilation tasks
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = 17
+}
+
+minecraft {
+    mappings channel: 'official', version: '1.19.2'
+
+    runs {
+        client {
+            workingDirectory project.file('run')
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'debug'
+            
+            mods {
+                eliteinventorybackups {
+                    source sourceSets.main
+                }
+            }
+        }
+
+        server {
+            workingDirectory project.file('run')
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'debug'
+            
+            mods {
+                eliteinventorybackups {
+                    source sourceSets.main
+                }
+            }
+        }
+    }
+}
+
+sourceSets.main.resources { srcDir 'src/generated/resources' }
+
+repositories {
+    mavenCentral()
+    maven { url = 'https://repo.spongepowered.org/maven' }
+}
+
+configurations {
+    embed
+    implementation.extendsFrom(embed)
+}
+
+dependencies {
+    minecraft 'net.minecraftforge:forge:1.19.2-43.2.0'
+
+    // Core dependencies that will be included in the JAR
+    compileOnly group: 'org.spongepowered', name: 'configurate-yaml', version: '4.0.0'
+    
+    // GSON is already provided by Forge - use 'implementation' instead of 'embed'
+    implementation group: 'com.google.code.gson', name: 'gson', version: '2.10.1'
+    
+    // Database dependencies - using older versions compatible with Java 17
+    embed 'com.h2database:h2:2.1.214'
+    embed 'mysql:mysql-connector-java:8.0.33'
+    
+    // Permission APIs (optional, fallback to OP if not available)
+    compileOnly 'net.luckperms:api:5.4'
+    
+    // Our own API module - removed since we don't need it for this mod
+    // embed project(':api')
+}
+
+// Process resources
+processResources {
+    inputs.property 'version', project.version
+    
+    filesMatching('META-INF/mods.toml') {
+        expand 'version': project.version
+    }
+}
+
+// Create a fat JAR that includes our dependencies
+jar {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    
+    // Add all dependencies to the JAR
+    from {
+        configurations.embed.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+    
+    // Exclude META-INF files from dependencies
+    exclude 'META-INF/MANIFEST.MF'
+    exclude 'META-INF/*.SF'
+    exclude 'META-INF/*.DSA'
+    exclude 'META-INF/*.RSA'
+    exclude "**/module-info.class"
+    
+    // Ensure reproducible builds
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+    
+    manifest {
+        attributes(
+            'Specification-Title': project.name,
+            'Specification-Vendor': 'strictgaming',
+            'Specification-Version': project.version,
+            'Implementation-Title': project.name,
+            'Implementation-Version': project.version,
+            'Implementation-Vendor': 'strictgaming'
+        )
+    }
+}
+
+// Fix reobf dependency
+reobf {
+    jar {}
+}
+
+// Only register the task if it doesn't already exist
+tasks.findByName('versionedRelease') ?: tasks.register('versionedRelease', Copy) {
+    from("build/libs/${archivesBaseName}-${version}.jar")
+    into('../../release/')
+    rename("${archivesBaseName}-${version}.jar", "${archivesBaseName}-${version}-Forge.jar")
+}
+
+build.finalizedBy('versionedRelease') 

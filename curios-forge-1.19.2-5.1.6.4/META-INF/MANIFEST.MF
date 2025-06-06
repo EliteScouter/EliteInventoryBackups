@@ -1,0 +1,10 @@
+Manifest-Version: 1.0
+Specification-Title: curios
+Specification-Vendor: C4
+Specification-Version: 1
+Implementation-Title: curios
+Implementation-Version: 1.19.2-5.1.6.4
+Implementation-Vendor: C4
+Implementation-Timestamp: 2024-10-24T21:36:25-0700
+MixinConfigs: curios.mixins.json
+

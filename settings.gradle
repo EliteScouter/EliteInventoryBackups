@@ -1,0 +1,4 @@
+rootProject.name = 'eliteinventorybackups'
+include 'api'
+include 'forge19'
+include 'forge20'

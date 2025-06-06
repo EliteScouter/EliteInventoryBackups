@@ -1,0 +1,29 @@
+We're encountering build issues because:
+
+1. The EnvyWare API dependencies are needed for the project, specifically forge19:7.2.8
+2. The repository should be available at https://maven.envyware.co.uk/releases
+3. We need to provide the correct Gradle configuration to download and use these dependencies
+
+According to the EnvyWare documentation, these modules should be available:
+- commons
+- discord
+- forge
+- forge16
+- forge19
+- forge20
+- spigot
+- reforged
+- reforged16
+
+However, we've been unable to successfully resolve the forge19 module. This could be due to:
+
+1. The module not being available in the public repository
+2. The version number being incorrect (we tried 7.2.8)
+3. Gradle configuration issues in our build.gradle file
+
+To get around this issue, we have two options:
+
+1. Adapt the 1.16.5 code to work with 1.19.2 without relying on the EnvyWare API
+2. Recreate the required functionality from scratch for 1.19.2
+
+We've been implementing the necessary utility classes from scratch to avoid the dependency issues. 

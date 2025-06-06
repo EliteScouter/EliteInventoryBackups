@@ -1,0 +1,40 @@
+// Set Java compatibility level
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
+
+// Ensure Java compatibility for all compilation tasks
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = 17
+}
+
+repositories {
+    maven {
+        name = 'spongepowered-repo'
+        url = 'https://repo.spongepowered.org/maven'
+    }
+
+    maven { url 'https://jitpack.io' }
+}
+
+forgeVersion = 'API'
+
+dependencies {
+    shadow group: 'org.spongepowered', name: 'configurate-yaml', version: '4.0.0'
+
+    compileOnly group: 'com.github.EnvyWare.API', name: 'commons', version: '1.9.6'
+}
+
+shadowJar {
+    configurations = [project.configurations.shadow]
+    archiveName = rootProject.name + '-API.jar'
+
+    relocate('org.spongepowered.configurate', 'com.envyful.api.commons.shade.configurate')
+    relocate('org.yaml.snakeyaml', 'com.envyful.api.commons.shade.snakeyaml')
+    relocate('io.leangen.geantyref', 'com.envyful.api.commons.shade.geantyref')
+
+    exclude "**/module-info.class"
+}

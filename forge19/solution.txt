@@ -1,0 +1,48 @@
+# AdvancedHolograms 1.19.2 Porting Project
+
+## What we've implemented
+
+1. Created proper build.gradle for Forge 1.19.2
+2. Implemented utility classes to replace EnvyWare API:
+   - UtilChatColour
+   - UtilWorld
+   - UtilPlayer
+   - UtilForgeConcurrency
+   - UtilPlaceholder
+   - UtilParse
+
+3. Updated classes to use 1.19.2 package names and methods:
+   - ForgeHolograms (main mod class)
+   - HologramsConfig
+   - ForgeHologram
+   - HologramLine
+
+4. Added command implementations for 1.19.2:
+   - HologramsCommand
+   - HologramsCreateCommand
+   - HologramsDeleteCommand
+   - HologramsAddLineCommand
+   - HologramsSetLineCommand
+
+## Steps to complete the port
+
+1. Fix package structure
+   All classes need to be placed in the correct package structure: `com.envyful.advanced.holograms.forge`. The IDE will show errors if this is not correctly set up.
+
+2. Compile the mod
+   Use the command `gradlew build` to compile the mod. This should create a JAR file in the `build/libs` directory.
+
+3. Test the mod
+   Test the mod in a Minecraft 1.19.2 server with Forge installed.
+
+## Known issues
+
+1. Dependencies
+   We've been unable to successfully resolve the EnvyWare API forge19 dependency. This might be because it's not publicly available or because we're using the wrong version.
+
+2. Our workaround
+   We've implemented our own utility classes to replace the EnvyWare API. This might lead to differences in behavior, but it should work for the core functionality.
+
+## Path forward
+
+The key improvement would be to understand the exact dependency requirements for the EnvyWare API. However, our implementation should work for the core functionality without these dependencies. 
