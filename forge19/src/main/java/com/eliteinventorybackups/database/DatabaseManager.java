@@ -29,6 +29,7 @@ public class DatabaseManager {
     private String jdbcUrl;
     private String username;
     private String password;
+    private volatile boolean isShuttingDown = false;
 
     public DatabaseManager() {
         ModConfig.DatabaseType dbType = ModConfig.SERVER.databaseType.get();
@@ -209,6 +210,11 @@ public class DatabaseManager {
      * @param entry The BackupEntry to save.
      */
     public void saveBackup(BackupEntry entry) {
+        if (isShuttingDown) {
+            LOGGER.warn("Database is shutting down, skipping backup save for player {}", entry.playerName());
+            return;
+        }
+        
         // Get the next backup number for this player
         int backupNumber = getNextBackupNumber(entry.playerUuid());
         
@@ -438,7 +444,31 @@ public class DatabaseManager {
     }
 
     public void shutdown() {
-        LOGGER.info("DatabaseManager shutting down. If using a connection pool, it would be closed here.");
+        LOGGER.info("DatabaseManager shutting down...");
+        isShuttingDown = true;
+        
+        try {
+            // For H2, explicitly run shutdown if it's an embedded database with a timeout
+            if (ModConfig.SERVER.databaseType.get() == ModConfig.DatabaseType.H2) {
+                try (Connection conn = getConnection()) {
+                    // Set a short timeout to prevent hanging
+                    conn.setNetworkTimeout(null, 2000); // 2 second timeout
+                    try (Statement stmt = conn.createStatement()) {
+                        stmt.setQueryTimeout(2); // 2 second query timeout
+                        stmt.execute("SHUTDOWN");
+                        LOGGER.info("H2 database shutdown command executed successfully.");
+                    }
+                } catch (SQLException e) {
+                    LOGGER.debug("H2 shutdown command failed (may already be closed): {}", e.getMessage());
+                }
+            }
+            
+            LOGGER.info("DatabaseManager shutdown completed successfully.");
+            
+        } catch (Exception e) {
+            LOGGER.error("Error during DatabaseManager shutdown", e);
+        }
+        
         // For basic DriverManager usage, individual connections are closed via try-with-resources.
         // If a connection pool (e.g., HikariCP) were implemented, this is where pool.close() would go.
     }

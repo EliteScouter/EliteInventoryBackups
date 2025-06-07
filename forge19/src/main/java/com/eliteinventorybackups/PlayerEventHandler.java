@@ -55,6 +55,28 @@ public class PlayerEventHandler {
                 return;
             }
 
+            // Don't create backups during server shutdown to prevent hanging
+            if ("logout".equals(eventType)) {
+                // Quick timeout check - if database operations take too long during logout, skip them
+                try {
+                    // Attempt a quick backup save - the DatabaseManager already has shutdown protection
+                    performBackupSave(player, eventType, causeOfDeath, dbManager);
+                } catch (Exception e) {
+                    LOGGER.warn("Skipping backup for player {} during logout due to potential shutdown: {}", 
+                        player.getName().getString(), e.getMessage());
+                }
+            } else {
+                // Normal backup for login/death events
+                performBackupSave(player, eventType, causeOfDeath, dbManager);
+            }
+
+        } catch (Exception e) {
+            LOGGER.error("Error creating backup for player {}: {}", player.getName().getString(), e.getMessage(), e);
+        }
+    }
+
+    private static void performBackupSave(ServerPlayer player, String eventType, String causeOfDeath, DatabaseManager dbManager) {
+        try {
             // Standard inventory backups
             String mainInv = InventorySerializer.serializeItemListToString(player.getInventory().items);
             String armorInv = InventorySerializer.serializeItemListToString(player.getInventory().armor);

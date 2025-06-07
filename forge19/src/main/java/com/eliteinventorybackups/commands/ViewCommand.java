@@ -28,8 +28,10 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ChestMenu;
 import net.minecraft.world.inventory.MenuType;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.nbt.CompoundTag;
 import org.slf4j.Logger;
 
 import java.text.SimpleDateFormat;
@@ -197,6 +199,28 @@ public class ViewCommand {
         return 1;
     }
     
+    private static ItemStack createNavigationItem(net.minecraft.world.item.Item item, Component name) {
+        ItemStack stack = new ItemStack(item);
+        stack.setHoverName(name);
+        
+        // Hide all the annoying tooltip info (food, durability, etc.)
+        CompoundTag tag = stack.getOrCreateTag();
+        tag.putInt("HideFlags", 63); // Hide everything except custom name
+        
+        return stack;
+    }
+    
+    private static ItemStack createCleanNavItem(Item item, Component name) {
+        ItemStack stack = new ItemStack(item);
+        stack.setHoverName(name);
+        
+        // Hide all default tooltip info (food stats, durability, etc.)
+        CompoundTag tag = stack.getOrCreateTag();
+        tag.putInt("HideFlags", 127); // Hide all flags
+        
+        return stack;
+    }
+    
     private static void addNavigationItems(SimpleContainer container, String currentSection, ViewerData viewerData) {
         // Navigation items in bottom row (slots 45-53)
         int navRow = 45;
@@ -204,58 +228,58 @@ public class ViewCommand {
         String baseCmd = "/eib view " + viewerData.playerName + " " + viewerData.backupNumber + " ";
         
         // Main inventory button
-        ItemStack mainButton = new ItemStack(Items.CHEST);
+        ItemStack mainButton;
         if ("main".equals(currentSection)) {
-            mainButton.setHoverName(Component.literal("§e► Main Inventory ◄§r\n§7Currently viewing"));
+            mainButton = createCleanNavItem(Items.CHEST, Component.literal("§e► Main Inventory ◄§r\n§7Currently viewing"));
         } else {
-            mainButton.setHoverName(Component.literal("§aMain Inventory§r\n§6Click to switch!"));
+            mainButton = createCleanNavItem(Items.CHEST, Component.literal("§aMain Inventory§r\n§6Click to switch!"));
         }
         container.setItem(navRow, mainButton);
         
         // Armor button
-        ItemStack armorButton = new ItemStack(Items.IRON_CHESTPLATE);
+        ItemStack armorButton;
         if ("armor".equals(currentSection)) {
-            armorButton.setHoverName(Component.literal("§e► Armor ◄§r\n§7Currently viewing"));
+            armorButton = createCleanNavItem(Items.IRON_CHESTPLATE, Component.literal("§e► Armor ◄§r\n§7Currently viewing"));
         } else {
-            armorButton.setHoverName(Component.literal("§bArmor§r\n§6Click to switch!"));
+            armorButton = createCleanNavItem(Items.IRON_CHESTPLATE, Component.literal("§bArmor§r\n§6Click to switch!"));
         }
         container.setItem(navRow + 1, armorButton);
         
         // Offhand button
-        ItemStack offhandButton = new ItemStack(Items.SHIELD);
+        ItemStack offhandButton;
         if ("offhand".equals(currentSection)) {
-            offhandButton.setHoverName(Component.literal("§e► Offhand ◄§r\n§7Currently viewing"));
+            offhandButton = createCleanNavItem(Items.SHIELD, Component.literal("§e► Offhand ◄§r\n§7Currently viewing"));
         } else {
-            offhandButton.setHoverName(Component.literal("§dOffhand§r\n§6Click to switch!"));
+            offhandButton = createCleanNavItem(Items.SHIELD, Component.literal("§dOffhand§r\n§6Click to switch!"));
         }
         container.setItem(navRow + 2, offhandButton);
         
         // Ender chest button
-        ItemStack enderButton = new ItemStack(Items.ENDER_CHEST);
+        ItemStack enderButton;
         if ("enderchest".equals(currentSection)) {
-            enderButton.setHoverName(Component.literal("§e► Ender Chest ◄§r\n§7Currently viewing"));
+            enderButton = createCleanNavItem(Items.ENDER_CHEST, Component.literal("§e► Ender Chest ◄§r\n§7Currently viewing"));
         } else {
-            enderButton.setHoverName(Component.literal("§5Ender Chest§r\n§6Click to switch!"));
+            enderButton = createCleanNavItem(Items.ENDER_CHEST, Component.literal("§5Ender Chest§r\n§6Click to switch!"));
         }
         container.setItem(navRow + 3, enderButton);
         
-        // Curios button
-        ItemStack curiosButton = new ItemStack(Items.GOLDEN_APPLE);
+        // Curios button (using a different item to avoid food stats)
+        ItemStack curiosButton;
         if ("curios".equals(currentSection)) {
-            curiosButton.setHoverName(Component.literal("§e► Curios ◄§r\n§7Currently viewing"));
+            curiosButton = createCleanNavItem(Items.GOLD_INGOT, Component.literal("§e► Curios ◄§r\n§7Currently viewing"));
         } else {
-            curiosButton.setHoverName(Component.literal("§6Curios§r\n§6Click to switch!"));
+            curiosButton = createCleanNavItem(Items.GOLD_INGOT, Component.literal("§6Curios§r\n§6Click to switch!"));
         }
         container.setItem(navRow + 4, curiosButton);
         
         // Info item
-        ItemStack infoButton = new ItemStack(Items.BOOK);
-        infoButton.setHoverName(Component.literal("§eBackup Info§r\n§7• Click items above to take them\n§7• Click navigation buttons to switch\n§7• Current: §f" + currentSection));
+        ItemStack infoButton = createCleanNavItem(Items.BOOK, 
+            Component.literal("§eBackup Info§r\n§7• Click items above to take them\n§7• Click navigation buttons to switch\n§7• Current: §f" + currentSection));
         container.setItem(navRow + 7, infoButton);
         
         // Close instruction
-        ItemStack closeButton = new ItemStack(Items.BARRIER);
-        closeButton.setHoverName(Component.literal("§cClose Viewer§r\n§6Click to close!"));
+        ItemStack closeButton = createCleanNavItem(Items.BARRIER, 
+            Component.literal("§cClose Viewer§r\n§6Click to close!"));
         container.setItem(navRow + 8, closeButton);
     }
     
@@ -305,6 +329,11 @@ public class ViewCommand {
     
     public static void cleanupViewer(UUID playerUUID) {
         activeViewers.remove(playerUUID);
+    }
+    
+    public static void cleanupAllViewers() {
+        LOGGER.info("Cleaning up {} active backup viewers", activeViewers.size());
+        activeViewers.clear();
     }
     
     public static ViewerData getViewerData(UUID playerUUID) {

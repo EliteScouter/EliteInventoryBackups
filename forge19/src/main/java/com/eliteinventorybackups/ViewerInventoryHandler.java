@@ -27,8 +27,13 @@ public class ViewerInventoryHandler {
     @SubscribeEvent 
     public static void onPlayerLogout(PlayerEvent.PlayerLoggedOutEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
-            // Clean up viewer data when player logs out
-            ViewCommand.cleanupViewer(player.getUUID());
+            try {
+                // Clean up viewer data when player logs out
+                ViewCommand.cleanupViewer(player.getUUID());
+            } catch (Exception e) {
+                // Don't let any errors in our cleanup affect server shutdown
+                LOGGER.debug("Error cleaning up viewer data for {}: {}", player.getName().getString(), e.getMessage());
+            }
         }
     }
 } 

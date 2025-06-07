@@ -2,6 +2,7 @@ package com.eliteinventorybackups;
 
 import com.eliteinventorybackups.config.ModConfig;
 import com.eliteinventorybackups.database.DatabaseManager;
+import com.eliteinventorybackups.commands.ViewCommand;
 import com.mojang.logging.LogUtils;
 import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
@@ -51,9 +52,25 @@ public class EliteInventoryBackups {
     @SubscribeEvent
     public void onServerStopping(ServerStoppingEvent event) {
         LOGGER.info("Elite Inventory Backups shutting down...");
-        if (databaseManager != null) {
-            databaseManager.shutdown();
+        
+        try {
+            // Clean up ViewCommand resources
+            ViewCommand.cleanupAllViewers();
+            LOGGER.info("ViewCommand cleanup completed.");
+        } catch (Exception e) {
+            LOGGER.error("Error during ViewCommand cleanup", e);
         }
+        
+        try {
+            // Shutdown database manager
+            if (databaseManager != null) {
+                databaseManager.shutdown();
+                LOGGER.info("DatabaseManager shutdown completed.");
+            }
+        } catch (Exception e) {
+            LOGGER.error("Error during DatabaseManager shutdown", e);
+        }
+        
         LOGGER.info("Elite Inventory Backups has shut down.");
     }
 
