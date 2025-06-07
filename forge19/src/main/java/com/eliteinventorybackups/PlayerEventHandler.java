@@ -26,21 +26,21 @@ public class PlayerEventHandler {
 
     @SubscribeEvent
     public static void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
-        if (event.getEntity() instanceof ServerPlayer player) {
+        if (event.getEntity() instanceof ServerPlayer player && ModConfig.SERVER.enableLoginSnapshots.get()) {
             createBackup(player, "login", null);
         }
     }
 
     @SubscribeEvent
     public static void onPlayerLogout(PlayerEvent.PlayerLoggedOutEvent event) {
-        if (event.getEntity() instanceof ServerPlayer player) {
+        if (event.getEntity() instanceof ServerPlayer player && ModConfig.SERVER.enableLogoutSnapshots.get()) {
             createBackup(player, "logout", null);
         }
     }
 
     @SubscribeEvent
     public static void onPlayerDeath(LivingDeathEvent event) {
-        if (event.getEntity() instanceof ServerPlayer player) {
+        if (event.getEntity() instanceof ServerPlayer player && ModConfig.SERVER.enableDeathSnapshots.get()) {
             DamageSource damageSource = event.getSource();
             String causeOfDeath = getCauseOfDeath(damageSource);
             createBackup(player, "death", causeOfDeath);

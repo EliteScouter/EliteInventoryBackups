@@ -14,6 +14,11 @@ public class ModConfig {
         public final ForgeConfigSpec.BooleanValue mysqlUseSSL;
         public final ForgeConfigSpec.ConfigValue<String> mysqlExtraParams;
 
+        // Event Snapshot Settings
+        public final ForgeConfigSpec.BooleanValue enableDeathSnapshots;
+        public final ForgeConfigSpec.BooleanValue enableLoginSnapshots;
+        public final ForgeConfigSpec.BooleanValue enableLogoutSnapshots;
+
         // Mod Integration Settings
         public final ForgeConfigSpec.BooleanValue enableCuriosBackup;
         public final ForgeConfigSpec.BooleanValue enableGenericNbtBackup;
@@ -21,6 +26,9 @@ public class ModConfig {
         public final ForgeConfigSpec.BooleanValue enableIronBackpacksBackup;
         public final ForgeConfigSpec.BooleanValue enableColytraBackup;
         public final ForgeConfigSpec.BooleanValue autoDetectModdedInventories;
+
+        // Backup Retention Settings
+        public final ForgeConfigSpec.IntValue maxBackupsPerPlayer;
 
         Server(ForgeConfigSpec.Builder builder) {
             builder.comment("Database settings for Elite Inventory Backups").push("database");
@@ -54,6 +62,30 @@ public class ModConfig {
             builder.pop(); // mysql
 
             builder.pop(); // database
+
+            builder.comment("Backup retention settings").push("retention");
+
+            maxBackupsPerPlayer = builder
+                .comment("Maximum number of backups to keep per player. Set to 0 for unlimited.")
+                .defineInRange("maxBackupsPerPlayer", 24, 0, Integer.MAX_VALUE);
+
+            builder.pop(); // retention
+
+            builder.comment("Event snapshot settings for controlling when backups are created").push("event_snapshots");
+
+            enableDeathSnapshots = builder
+                .comment("Enable automatic inventory backups when a player dies.")
+                .define("enableDeathSnapshots", true);
+
+            enableLoginSnapshots = builder
+                .comment("Enable automatic inventory backups when a player logs in.")
+                .define("enableLoginSnapshots", true);
+
+            enableLogoutSnapshots = builder
+                .comment("Enable automatic inventory backups when a player logs out.")
+                .define("enableLogoutSnapshots", true);
+
+            builder.pop(); // event_snapshots
 
             builder.comment("Mod integration settings for backing up modded inventories").push("mod_integrations");
 

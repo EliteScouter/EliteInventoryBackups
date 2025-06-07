@@ -23,6 +23,7 @@ public class CommandRegistry {
             .then(ListCommand.register(dispatcher))
             .then(ViewCommand.register(dispatcher))
             .then(RestoreCommand.register(dispatcher))
+            .then(RemoveAllCommand.register(dispatcher))
             ;
 
         dispatcher.register(eibCommand);

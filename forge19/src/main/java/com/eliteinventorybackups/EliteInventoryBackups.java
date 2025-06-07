@@ -2,15 +2,14 @@ package com.eliteinventorybackups;
 
 import com.eliteinventorybackups.config.ModConfig;
 import com.eliteinventorybackups.database.DatabaseManager;
-import com.eliteinventorybackups.network.PacketHandler;
 import com.mojang.logging.LogUtils;
 import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.config.ModConfig.Type;
-import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
-import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
+
 import org.slf4j.Logger;
 import net.minecraftforge.event.server.ServerStoppingEvent;
+import net.minecraftforge.event.server.ServerStartingEvent;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 
@@ -24,15 +23,12 @@ public class EliteInventoryBackups {
     public EliteInventoryBackups() {
         LOGGER.info("Elite Inventory Backups is loading!");
 
-        // Register config
-        ModLoadingContext.get().registerConfig(Type.SERVER, ModConfig.SERVER_SPEC);
+        // Register config in custom location
+        ModLoadingContext.get().registerConfig(Type.COMMON, ModConfig.SERVER_SPEC, "eliteinventorybackups/config.toml");
 
-        // Initialize DatabaseManager *after* config is loaded, or make it config-aware
-        // For now, we'll make DatabaseManager read from config upon instantiation.
-        databaseManager = new DatabaseManager();
+        // DatabaseManager will be initialized when server starts and config is loaded
         
-        // Register common setup method for tasks like packet registration
-        FMLJavaModLoadingContext.get().getModEventBus().addListener(this::commonSetup);
+        // No packet registration needed - server-side only
         
         // Register server lifecycle events like ServerStoppingEvent on the FORGE event bus
         MinecraftForge.EVENT_BUS.register(this);
@@ -40,11 +36,16 @@ public class EliteInventoryBackups {
         // Event registration for PlayerEventHandler and CommandRegistry is handled by @Mod.EventBusSubscriber
     }
 
-    private void commonSetup(final FMLCommonSetupEvent event) {
-        event.enqueueWork(() -> {
-            PacketHandler.register();
-            LOGGER.info("Registered packet handlers.");
-        });
+
+
+    @SubscribeEvent
+    public void onServerStarting(ServerStartingEvent event) {
+        LOGGER.info("Server starting, initializing DatabaseManager with config...");
+        // Config is now loaded, safe to initialize DatabaseManager
+        if (databaseManager == null) {
+            databaseManager = new DatabaseManager();
+            LOGGER.info("DatabaseManager initialized successfully.");
+        }
     }
 
     @SubscribeEvent

@@ -27,7 +27,7 @@ import java.util.List;
 public class RestoreCommand {
     private static final Logger LOGGER = LogUtils.getLogger();
     
-    private static final SuggestionProvider<CommandSourceStack> BACKUP_ID_SUGGESTIONS = (context, builder) -> {
+    private static final SuggestionProvider<CommandSourceStack> BACKUP_NUMBER_SUGGESTIONS = (context, builder) -> {
         try {
             // Get the player argument from the context
             ServerPlayer targetPlayer = EntityArgument.getPlayer(context, "player");
@@ -36,7 +36,7 @@ public class RestoreCommand {
             if (dbManager != null) {
                 List<BackupSummary> summaries = dbManager.getBackupsSummaryForPlayer(targetPlayer.getUUID());
                 for (BackupSummary summary : summaries) {
-                    builder.suggest(summary.id());
+                    builder.suggest(summary.id()); // This now contains backup_number, not database id
                 }
             }
         } catch (Exception e) {
@@ -49,12 +49,12 @@ public class RestoreCommand {
         return Commands.literal("restore")
             .requires(PermissionUtil::hasAdminPermission)
             .then(Commands.argument("player", EntityArgument.player())
-                .then(Commands.argument("backupId", IntegerArgumentType.integer(1))
-                    .suggests(BACKUP_ID_SUGGESTIONS)
+                .then(Commands.argument("backupNumber", IntegerArgumentType.integer(1))
+                    .suggests(BACKUP_NUMBER_SUGGESTIONS)
                     .executes(context -> {
                         CommandSourceStack source = context.getSource();
                         ServerPlayer targetPlayer = EntityArgument.getPlayer(context, "player");
-                        int backupId = IntegerArgumentType.getInteger(context, "backupId");
+                        int backupNumber = IntegerArgumentType.getInteger(context, "backupNumber");
 
                         DatabaseManager dbManager = EliteInventoryBackups.getDatabaseManager();
                         if (dbManager == null) {
@@ -62,14 +62,9 @@ public class RestoreCommand {
                             return 0;
                         }
 
-                        BackupEntry backupEntry = dbManager.getBackupById(backupId);
+                        BackupEntry backupEntry = dbManager.getBackupByNumber(targetPlayer.getUUID(), backupNumber);
                         if (backupEntry == null) {
-                            source.sendFailure(Component.literal("Backup with ID " + backupId + " not found."));
-                            return 0;
-                        }
-
-                        if (!backupEntry.playerUuid().equals(targetPlayer.getUUID())) {
-                            source.sendFailure(Component.literal("Backup ID " + backupId + " does not belong to player " + targetPlayer.getName().getString() + "."));
+                            source.sendFailure(Component.literal("Backup #" + backupNumber + " not found for player " + targetPlayer.getName().getString() + "."));
                             return 0;
                         }
 
@@ -109,12 +104,24 @@ public class RestoreCommand {
                             
                             // Restore Curios if available and enabled
                             if (ModConfig.SERVER.enableCuriosBackup.get() && CuriosIntegration.isAvailable() && backupEntry.inventoryCurios() != null) {
+                                LOGGER.info("Attempting to restore Curios for player {}. Curios data: {}", 
+                                    targetPlayer.getName().getString(), 
+                                    backupEntry.inventoryCurios().length() > 100 ? 
+                                        backupEntry.inventoryCurios().substring(0, 100) + "..." : 
+                                        backupEntry.inventoryCurios());
+                                
                                 boolean curiosRestored = CuriosIntegration.restoreCurios(targetPlayer, backupEntry.inventoryCurios());
                                 if (curiosRestored) {
-                                    LOGGER.debug("Successfully restored Curios for player {}", targetPlayer.getName().getString());
+                                    LOGGER.info("Successfully restored Curios for player {}", targetPlayer.getName().getString());
                                 } else {
                                     LOGGER.warn("Failed to restore Curios for player {}", targetPlayer.getName().getString());
                                 }
+                            } else {
+                                LOGGER.info("Curios restoration skipped for player {}. Enabled: {}, Available: {}, Data: {}", 
+                                    targetPlayer.getName().getString(),
+                                    ModConfig.SERVER.enableCuriosBackup.get(),
+                                    CuriosIntegration.isAvailable(),
+                                    backupEntry.inventoryCurios() != null ? "present" : "null");
                             }
                             
                             // Restore Generic NBT if available and enabled
@@ -132,12 +139,12 @@ public class RestoreCommand {
                             // Ender chest updates are usually handled, but can be forced if needed.
                             targetPlayer.containerMenu.broadcastChanges(); // General update for player container
 
-                            source.sendSuccess(Component.literal("Successfully restored backup ID " + backupId + " for player " + targetPlayer.getName().getString()), true);
-                            LOGGER.info("Player {} restored {} from backup ID {}", source.getTextName(), targetPlayer.getName().getString(), backupId);
+                            source.sendSuccess(Component.literal("Successfully restored backup #" + backupNumber + " for player " + targetPlayer.getName().getString()), true);
+                            LOGGER.info("Player {} restored {} from backup #{}", source.getTextName(), targetPlayer.getName().getString(), backupNumber);
                             return 1;
 
                         } catch (Exception e) {
-                            LOGGER.error("Error restoring backup ID {} for player {}: {}", backupId, targetPlayer.getName().getString(), e.getMessage(), e);
+                            LOGGER.error("Error restoring backup #{} for player {}: {}", backupNumber, targetPlayer.getName().getString(), e.getMessage(), e);
                             source.sendFailure(Component.literal("An error occurred during restore: " + e.getMessage()));
                             return 0;
                         }

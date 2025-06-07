@@ -1,0 +1,118 @@
+# Cursor Rules for Development
+
+## Communication Style
+- Be casual unless otherwise specified
+- Be terse and direct
+- Suggest solutions I didn't think about—anticipate my needs
+- Be accurate and thorough
+- Give the answer immediately, provide detailed explanations after if needed
+- Value good arguments over authorities
+- Consider new technologies and contrarian ideas
+- Use speculation/prediction when helpful, just flag it
+- No moral lectures or unnecessary safety warnings
+- Cite sources at the end, not inline
+- No need to mention knowledge cutoffs or AI disclosure
+
+## Code Style & Preferences
+- Respect prettier preferences when providing code
+- Split responses if one isn't enough
+- Use standard logging modules and proper logging in ALL projects
+- Keep answers brief - show just a few lines before/after changes
+- Multiple code blocks are fine
+
+## General Programming Principles
+- Write concise, technical responses with accurate examples
+- Use functional, declarative programming; avoid classes where possible
+- Prefer iteration and modularization over code duplication
+- Use descriptive variable names with auxiliary verbs (e.g., isActive, hasPermission)
+- Use lowercase with underscores for directories and files
+- Favor named exports for utilities and functions
+
+## Java/Minecraft Forge Specific
+- Use proper Java naming conventions (camelCase for methods/variables, PascalCase for classes)
+- Always include proper imports and package declarations
+- Use Optional<> for nullable returns instead of null checks where appropriate
+- Implement proper error handling with try-catch blocks
+- Use @Override annotations consistently
+- Leverage Forge's event system properly with @SubscribeEvent
+- Use ResourceLocation for mod resources consistently
+- Implement proper client/server side checks with DistExecutor
+
+## Error Handling & Validation
+- Handle errors and edge cases at the beginning of functions
+- Use early returns for error conditions
+- Place happy path last for improved readability
+- Avoid unnecessary else statements; use if-return pattern
+- Use guard clauses for preconditions and invalid states
+- Implement proper error logging with meaningful messages
+- Use custom exceptions for specific error types
+
+## Minecraft Forge Guidelines
+- Use @Mod.EventBusSubscriber for static event handlers
+- Implement proper lifecycle event handling (FMLCommonSetupEvent, etc.)
+- Use ForgeConfigSpec for configuration management
+- Register items/blocks/entities during appropriate events
+- Use capability system for data attachment
+- Implement proper client/server synchronization
+- Use NetworkRegistry for custom packets
+- Follow Forge's registry system for all registerable objects
+
+## Performance & Optimization
+- Minimize blocking operations on main thread
+- Use async operations for I/O-bound tasks (database, file operations)
+- Implement caching for frequently accessed data
+- Use lazy loading for expensive operations
+- Cache reflection calls and resource lookups
+- Use efficient data structures (avoid nested loops where possible)
+
+## Configuration & Data Management
+- Use ForgeConfigSpec for all configuration options
+- Implement proper default values with comments
+- Use TOML format for config files
+- Place config files in appropriate directories (common vs server)
+- Validate configuration values with custom validators
+- Support hot-reloading of config where possible
+
+## Database & Persistence
+- Use proper connection pooling for databases
+- Implement connection retry logic
+- Use prepared statements to prevent SQL injection
+- Close resources properly with try-with-resources
+- Log database operations appropriately
+- Support both embedded (H2) and external (MySQL) databases
+
+## Logging Standards
+- Use proper log levels (TRACE, DEBUG, INFO, WARN, ERROR)
+- Include context in log messages (player names, coordinates, etc.)
+- Don't log sensitive information (passwords, tokens)
+- Use structured logging with consistent formatting
+- Log important state changes and errors
+- Use conditional logging for expensive operations
+
+## Key Conventions
+1. Always check if code runs on logical client vs logical server
+2. Use proper synchronization for shared mutable state
+3. Implement proper cleanup in disposal methods
+4. Use meaningful variable and method names
+5. Comment complex business logic, not obvious code
+6. Use constants for magic numbers and strings
+7. Implement proper null safety checks
+8. Follow Forge's lifecycle and threading model
+
+## File Organization
+- Group related classes in appropriate packages
+- Use clear package naming (commands, events, database, etc.)
+- Keep configuration classes separate from implementation
+- Separate client-only and server-only code
+- Use meaningful file and class names
+- Keep classes focused on single responsibility
+
+## Testing & Debugging
+- Include proper error messages with context
+- Use debug logging for troubleshooting
+- Test both client and server scenarios
+- Validate edge cases (empty inventories, null players, etc.)
+- Test configuration loading and validation
+- Verify database operations work correctly
+
+When working on Minecraft Forge projects, prioritize compatibility, performance, and proper Forge integration patterns. Always consider the mod's impact on game performance and user experience.

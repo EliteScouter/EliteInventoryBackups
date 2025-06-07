@@ -4,33 +4,46 @@ import com.eliteinventorybackups.EliteInventoryBackups;
 import com.eliteinventorybackups.database.DatabaseManager;
 import com.eliteinventorybackups.model.BackupEntry;
 import com.eliteinventorybackups.model.BackupSummary;
-import com.eliteinventorybackups.network.OpenBackupViewerGUIPacket;
-import com.eliteinventorybackups.network.PacketHandler;
+import com.eliteinventorybackups.util.InventorySerializer;
+import com.eliteinventorybackups.util.PermissionUtil;
+import com.eliteinventorybackups.integration.CuriosIntegration;
+import com.eliteinventorybackups.BackupViewerContainer;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
-import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
-import com.mojang.brigadier.suggestion.Suggestions;
-import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import com.mojang.logging.LogUtils;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.EntityArgument;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.Container;
+import net.minecraft.world.MenuProvider;
+import net.minecraft.world.SimpleContainer;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.ChestMenu;
+import net.minecraft.world.inventory.MenuType;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import org.slf4j.Logger;
-import com.mojang.logging.LogUtils;
-import com.eliteinventorybackups.util.PermissionUtil;
 
-import java.util.List;
-import java.util.concurrent.CompletableFuture;
+import java.text.SimpleDateFormat;
+import java.util.*;
 
 public class ViewCommand {
     private static final Logger LOGGER = LogUtils.getLogger();
+    private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
     
-    private static final SuggestionProvider<CommandSourceStack> BACKUP_ID_SUGGESTIONS = (context, builder) -> {
+    // Store backup data for open inventories
+    private static final Map<UUID, ViewerData> activeViewers = new HashMap<>();
+    
+    private static final SuggestionProvider<CommandSourceStack> BACKUP_NUMBER_SUGGESTIONS = (context, builder) -> {
         try {
-            // Get the player argument from the context
             ServerPlayer targetPlayer = EntityArgument.getPlayer(context, "player");
             DatabaseManager dbManager = EliteInventoryBackups.getDatabaseManager();
             
@@ -41,8 +54,17 @@ public class ViewCommand {
                 }
             }
         } catch (Exception e) {
-            // If we can't get the player or database, just don't suggest anything
+            // If we can't get suggestions, just don't suggest anything
         }
+        return builder.buildFuture();
+    };
+    
+    private static final SuggestionProvider<CommandSourceStack> SECTION_SUGGESTIONS = (context, builder) -> {
+        builder.suggest("main");
+        builder.suggest("armor");
+        builder.suggest("offhand");
+        builder.suggest("enderchest");
+        builder.suggest("curios");
         return builder.buildFuture();
     };
 
@@ -50,59 +72,254 @@ public class ViewCommand {
         return Commands.literal("view")
             .requires(PermissionUtil::hasAdminPermission)
             .then(Commands.argument("player", EntityArgument.player())
-                .then(Commands.argument("backupId", IntegerArgumentType.integer(1))
-                    .suggests(BACKUP_ID_SUGGESTIONS)
+                .then(Commands.argument("backupNumber", IntegerArgumentType.integer(1))
+                    .suggests(BACKUP_NUMBER_SUGGESTIONS)
                     .executes(context -> {
-                        CommandSourceStack source = context.getSource();
-                        ServerPlayer targetPlayer = EntityArgument.getPlayer(context, "player");
-                        int backupId = IntegerArgumentType.getInteger(context, "backupId");
-
-                        ServerPlayer adminPlayer;
-                        try {
-                            adminPlayer = source.getPlayerOrException();
-                        } catch (CommandSyntaxException e) {
-                            source.sendFailure(Component.literal("This command must be run by a player."));
-                            return 0;
-                        }
-
-                        DatabaseManager dbManager = EliteInventoryBackups.getDatabaseManager();
-                        if (dbManager == null) {
-                            source.sendFailure(Component.literal("DatabaseManager not initialized."));
-                            return 0;
-                        }
-
-                        BackupEntry backupEntry = dbManager.getBackupById(backupId);
-
-                        if (backupEntry == null) {
-                            source.sendFailure(Component.literal("Backup with ID " + backupId + " not found."));
-                            return 0;
-                        }
-                        
-                        // Ensure the backup belongs to the specified target player (optional, but good for consistency)
-                        if (!backupEntry.playerUuid().equals(targetPlayer.getUUID())) {
-                            source.sendFailure(Component.literal("Backup ID " + backupId + " does not belong to player " + targetPlayer.getName().getString() + "."));
-                            return 0;
-                        }
-
-                        // Send packet to the admin player to open the GUI
-                        OpenBackupViewerGUIPacket packet = new OpenBackupViewerGUIPacket(
-                            backupEntry.id(), // Assuming BackupEntry has an ID, which it should from the DB table
-                            backupEntry.playerName(),
-                            backupEntry.timestamp(),
-                            backupEntry.eventType(),
-                            backupEntry.inventoryMain(),
-                            backupEntry.inventoryArmor(),
-                            backupEntry.inventoryOffhand(),
-                            backupEntry.inventoryEnderChest(),
-                            backupEntry.inventoryCurios(),
-                            backupEntry.playerNbt()
-                        );
-                        PacketHandler.sendToPlayer(packet, adminPlayer);
-                        
-                        source.sendSuccess(Component.literal("Opening backup viewer for " + targetPlayer.getName().getString() + " (ID: " + backupId + ")."), false);
-                        return 1;
+                        // Default to main inventory
+                        return openBackupView(context.getSource(), 
+                            EntityArgument.getPlayer(context, "player"),
+                            IntegerArgumentType.getInteger(context, "backupNumber"),
+                            "main");
                     })
+                    .then(Commands.argument("section", StringArgumentType.string())
+                        .suggests(SECTION_SUGGESTIONS)
+                        .executes(context -> {
+                            return openBackupView(context.getSource(),
+                                EntityArgument.getPlayer(context, "player"),
+                                IntegerArgumentType.getInteger(context, "backupNumber"),
+                                StringArgumentType.getString(context, "section"));
+                        })
+                    )
                 )
             );
+    }
+    
+    private static int openBackupView(CommandSourceStack source, ServerPlayer targetPlayer, int backupNumber, String section) {
+        if (!(source.getEntity() instanceof ServerPlayer adminPlayer)) {
+            source.sendFailure(Component.literal("This command can only be executed by a player."));
+            return 0;
+        }
+        
+        DatabaseManager dbManager = EliteInventoryBackups.getDatabaseManager();
+        if (dbManager == null) {
+            source.sendFailure(Component.literal("DatabaseManager not initialized."));
+            return 0;
+        }
+        
+        BackupEntry backupEntry = dbManager.getBackupByNumber(targetPlayer.getUUID(), backupNumber);
+        if (backupEntry == null) {
+            source.sendFailure(Component.literal("Backup #" + backupNumber + " not found for player " + targetPlayer.getName().getString() + "."));
+            return 0;
+        }
+        
+        // Store backup data for this viewer
+        ViewerData viewerData = new ViewerData(backupEntry, targetPlayer.getName().getString(), backupNumber);
+        activeViewers.put(adminPlayer.getUUID(), viewerData);
+        
+        // Open the specified section
+        return openInventorySection(adminPlayer, section, viewerData);
+    }
+    
+    public static int openInventorySection(ServerPlayer adminPlayer, String section, ViewerData viewerData) {
+        List<ItemStack> items;
+        String displayName;
+        
+        switch (section.toLowerCase()) {
+            case "main":
+                items = InventorySerializer.deserializeStringToList(viewerData.backupEntry.inventoryMain());
+                displayName = "Main Inventory";
+                break;
+            case "armor":
+                items = InventorySerializer.deserializeStringToList(viewerData.backupEntry.inventoryArmor());
+                displayName = "Armor";
+                break;
+            case "offhand":
+                items = InventorySerializer.deserializeStringToList(viewerData.backupEntry.inventoryOffhand());
+                displayName = "Offhand";
+                break;
+            case "enderchest":
+                items = InventorySerializer.deserializeStringToList(viewerData.backupEntry.inventoryEnderChest());
+                displayName = "Ender Chest";
+                break;
+            case "curios":
+                if (viewerData.backupEntry.inventoryCurios() != null && !viewerData.backupEntry.inventoryCurios().equals("{}")) {
+                    items = getCuriosItems(viewerData.backupEntry.inventoryCurios());
+                    displayName = "Curios";
+                } else {
+                    adminPlayer.sendSystemMessage(Component.literal("No Curios data found in this backup."));
+                    return 0;
+                }
+                break;
+            default:
+                adminPlayer.sendSystemMessage(Component.literal("Invalid section. Use: main, armor, offhand, enderchest, curios"));
+                return 0;
+        }
+        
+        // Create virtual chest inventory
+        SimpleContainer container = new SimpleContainer(54); // Double chest size
+        
+        // Add navigation items in the bottom row
+        addNavigationItems(container, section, viewerData);
+        
+        // Add the actual items (up to 45 slots, leaving bottom row for navigation)
+        for (int i = 0; i < Math.min(items.size(), 45); i++) {
+            ItemStack item = items.get(i);
+            if (item != null && !item.isEmpty()) {
+                container.setItem(i, item.copy());
+            }
+        }
+        
+        // Open the chest for the admin player
+        MenuProvider menuProvider = new MenuProvider() {
+            @Override
+            public Component getDisplayName() {
+                return Component.literal(String.format("%s #%d - %s", 
+                    viewerData.playerName,
+                    viewerData.backupNumber,
+                    displayName));
+            }
+            
+            @Override
+            public AbstractContainerMenu createMenu(int containerId, Inventory playerInventory, Player player) {
+                return new BackupViewerContainer(containerId, playerInventory, container, viewerData);
+            }
+        };
+        
+        adminPlayer.openMenu(menuProvider);
+        adminPlayer.sendSystemMessage(Component.literal(String.format("Opened %s for %s (Backup #%d). Items: %d", 
+            displayName, viewerData.playerName, viewerData.backupNumber, items.size())));
+        
+        if (items.size() > 45) {
+            adminPlayer.sendSystemMessage(Component.literal("§6Warning: This section has " + items.size() + 
+                " items, but only showing first 45. Consider using commands for full access."));
+        }
+        
+        return 1;
+    }
+    
+    private static void addNavigationItems(SimpleContainer container, String currentSection, ViewerData viewerData) {
+        // Navigation items in bottom row (slots 45-53)
+        int navRow = 45;
+        
+        String baseCmd = "/eib view " + viewerData.playerName + " " + viewerData.backupNumber + " ";
+        
+        // Main inventory button
+        ItemStack mainButton = new ItemStack(Items.CHEST);
+        if ("main".equals(currentSection)) {
+            mainButton.setHoverName(Component.literal("§e► Main Inventory ◄§r\n§7Currently viewing"));
+        } else {
+            mainButton.setHoverName(Component.literal("§aMain Inventory§r\n§6Click to switch!"));
+        }
+        container.setItem(navRow, mainButton);
+        
+        // Armor button
+        ItemStack armorButton = new ItemStack(Items.IRON_CHESTPLATE);
+        if ("armor".equals(currentSection)) {
+            armorButton.setHoverName(Component.literal("§e► Armor ◄§r\n§7Currently viewing"));
+        } else {
+            armorButton.setHoverName(Component.literal("§bArmor§r\n§6Click to switch!"));
+        }
+        container.setItem(navRow + 1, armorButton);
+        
+        // Offhand button
+        ItemStack offhandButton = new ItemStack(Items.SHIELD);
+        if ("offhand".equals(currentSection)) {
+            offhandButton.setHoverName(Component.literal("§e► Offhand ◄§r\n§7Currently viewing"));
+        } else {
+            offhandButton.setHoverName(Component.literal("§dOffhand§r\n§6Click to switch!"));
+        }
+        container.setItem(navRow + 2, offhandButton);
+        
+        // Ender chest button
+        ItemStack enderButton = new ItemStack(Items.ENDER_CHEST);
+        if ("enderchest".equals(currentSection)) {
+            enderButton.setHoverName(Component.literal("§e► Ender Chest ◄§r\n§7Currently viewing"));
+        } else {
+            enderButton.setHoverName(Component.literal("§5Ender Chest§r\n§6Click to switch!"));
+        }
+        container.setItem(navRow + 3, enderButton);
+        
+        // Curios button
+        ItemStack curiosButton = new ItemStack(Items.GOLDEN_APPLE);
+        if ("curios".equals(currentSection)) {
+            curiosButton.setHoverName(Component.literal("§e► Curios ◄§r\n§7Currently viewing"));
+        } else {
+            curiosButton.setHoverName(Component.literal("§6Curios§r\n§6Click to switch!"));
+        }
+        container.setItem(navRow + 4, curiosButton);
+        
+        // Info item
+        ItemStack infoButton = new ItemStack(Items.BOOK);
+        infoButton.setHoverName(Component.literal("§eBackup Info§r\n§7• Click items above to take them\n§7• Click navigation buttons to switch\n§7• Current: §f" + currentSection));
+        container.setItem(navRow + 7, infoButton);
+        
+        // Close instruction
+        ItemStack closeButton = new ItemStack(Items.BARRIER);
+        closeButton.setHoverName(Component.literal("§cClose Viewer§r\n§6Click to close!"));
+        container.setItem(navRow + 8, closeButton);
+    }
+    
+    private static List<ItemStack> getCuriosItems(String curiosData) {
+        List<ItemStack> allItems = new ArrayList<>();
+        
+        try {
+            if (curiosData.startsWith("{") && curiosData.endsWith("}")) {
+                String content = curiosData.substring(1, curiosData.length() - 1);
+                if (content.trim().isEmpty()) {
+                    return allItems;
+                }
+                
+                String[] pairs = content.split(",(?=\")");
+                for (String pair : pairs) {
+                    String[] keyValue = pair.split("\":", 2);
+                    if (keyValue.length == 2) {
+                        String slotType = keyValue[0].substring(1); // Remove leading quote
+                        String stacksData = keyValue[1];
+                        
+                        if (stacksData.startsWith("\"") && stacksData.endsWith("\"")) {
+                            stacksData = stacksData.substring(1, stacksData.length() - 1);
+                        }
+                        stacksData = stacksData.replace("\\\"", "\"");
+                        
+                        List<ItemStack> slotItems = InventorySerializer.deserializeStringToList(stacksData);
+                        
+                        // Add slot type info to items
+                        for (int i = 0; i < slotItems.size(); i++) {
+                            ItemStack item = slotItems.get(i);
+                            if (item != null && !item.isEmpty()) {
+                                // Add lore indicating which Curios slot this came from
+                                ItemStack itemWithLore = item.copy();
+                                itemWithLore.setHoverName(Component.literal(item.getDisplayName().getString() + " §7(" + slotType + " #" + i + ")"));
+                                allItems.add(itemWithLore);
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            LOGGER.error("Failed to parse Curios items: {}", e.getMessage(), e);
+        }
+        
+        return allItems;
+    }
+    
+    public static void cleanupViewer(UUID playerUUID) {
+        activeViewers.remove(playerUUID);
+    }
+    
+    public static ViewerData getViewerData(UUID playerUUID) {
+        return activeViewers.get(playerUUID);
+    }
+    
+    public static class ViewerData {
+        public final BackupEntry backupEntry;
+        public final String playerName;
+        public final int backupNumber;
+        
+        public ViewerData(BackupEntry backupEntry, String playerName, int backupNumber) {
+            this.backupEntry = backupEntry;
+            this.playerName = playerName;
+            this.backupNumber = backupNumber;
+        }
     }
 } 

@@ -115,7 +115,12 @@ public class CuriosIntegration {
                 }
             }
             
-            return serializeCuriosData(curiosSlots);
+            String serializedData = serializeCuriosData(curiosSlots);
+            LOGGER.info("Backed up Curios for player {}: {} slot types, serialized data: {}", 
+                player.getName().getString(), 
+                curiosSlots.size(),
+                serializedData.length() > 200 ? serializedData.substring(0, 200) + "..." : serializedData);
+            return serializedData;
             
         } catch (Exception e) {
             LOGGER.error("Failed to backup Curios for player {}: {}", player.getName().getString(), e.getMessage(), e);
@@ -198,12 +203,15 @@ public class CuriosIntegration {
                 for (String slotType : curiosSlots.keySet()) {
                     Object slotHandler = slots.get(slotType);
                     if (slotHandler != null) {
-                        restoreStacksToSlot(slotHandler, curiosSlots.get(slotType));
+                        List<ItemStack> itemsToRestore = curiosSlots.get(slotType);
+                        LOGGER.info("Restoring {} items to Curios slot type '{}'", itemsToRestore.size(), slotType);
+                        restoreStacksToSlot(slotHandler, itemsToRestore);
+                    } else {
+                        LOGGER.warn("Curios slot type '{}' not found in current player inventory - items not restored", slotType);
                     }
                 }
             }
             
-            syncCuriosToClient(player);
             return true;
             
         } catch (Exception e) {
@@ -219,14 +227,34 @@ public class CuriosIntegration {
             Object stacksHandler = getStacksMethod.invoke(slotHandler);
             
             if (stacksHandler != null) {
-                // Set each stack using setStackInSlot(int, ItemStack)
+                // Get the slot size first
+                Method getSlotsMethod = stacksHandler.getClass().getMethod("getSlots");
+                int maxSlots = (Integer) getSlotsMethod.invoke(stacksHandler);
+                
                 Method setStackInSlotMethod = stacksHandler.getClass().getMethod("setStackInSlot", int.class, ItemStack.class);
-                for (int i = 0; i < stacks.size(); i++) {
-                    setStackInSlotMethod.invoke(stacksHandler, i, stacks.get(i));
+                
+                // Clear existing slots first
+                for (int i = 0; i < maxSlots; i++) {
+                    setStackInSlotMethod.invoke(stacksHandler, i, ItemStack.EMPTY);
+                }
+                
+                // Restore items, but don't exceed the slot limit
+                int itemsToRestore = Math.min(stacks.size(), maxSlots);
+                for (int i = 0; i < itemsToRestore; i++) {
+                    ItemStack stackToRestore = stacks.get(i);
+                    if (stackToRestore != null && !stackToRestore.isEmpty()) {
+                        setStackInSlotMethod.invoke(stacksHandler, i, stackToRestore);
+                        LOGGER.info("Restored Curios item {} to slot {}", stackToRestore.getDisplayName().getString(), i);
+                    }
+                }
+                
+                if (stacks.size() > maxSlots) {
+                    LOGGER.warn("Tried to restore {} Curios items but slot only has {} slots - some items were not restored", 
+                        stacks.size(), maxSlots);
                 }
             }
         } catch (Exception e) {
-            LOGGER.debug("Failed to restore stacks to slot: {}", e.getMessage());
+            LOGGER.error("Failed to restore stacks to slot: {}", e.getMessage(), e);
         }
     }
     
@@ -344,7 +372,6 @@ public class CuriosIntegration {
                     if (stacksHandler != null) {
                         Method setStackInSlotMethod = stacksHandler.getClass().getMethod("setStackInSlot", int.class, ItemStack.class);
                         setStackInSlotMethod.invoke(stacksHandler, index, stack);
-                        syncCuriosToClient(player);
                         return true;
                     }
                 }
@@ -357,25 +384,7 @@ public class CuriosIntegration {
         return false;
     }
     
-    /**
-     * Sync Curios to client (trigger a network update)
-     */
-    private static void syncCuriosToClient(ServerPlayer player) {
-        try {
-            // Try to trigger a network sync
-            Class<?> networkHandlerClass = Class.forName("top.theillusivec4.curios.common.network.NetworkHandler");
-            Method sendToPlayerMethod = networkHandlerClass.getMethod("sendToPlayer", Object.class, ServerPlayer.class);
-            
-            // Create a sync packet
-            Class<?> syncPacketClass = Class.forName("top.theillusivec4.curios.common.network.server.SPacketSyncStack");
-            Object syncPacket = syncPacketClass.getConstructor(ServerPlayer.class).newInstance(player);
-            
-            sendToPlayerMethod.invoke(null, syncPacket, player);
-            
-        } catch (Exception e) {
-            LOGGER.debug("Failed to sync Curios to client: {}", e.getMessage());
-        }
-    }
+
     
     /**
      * Serialize curios data to JSON-like string format
@@ -391,19 +400,12 @@ public class CuriosIntegration {
             }
             first = false;
             
-            sb.append("\"").append(entry.getKey()).append("\":[");
+            sb.append("\"").append(entry.getKey()).append("\":");
             
+            // Use the InventorySerializer to serialize the list of items properly
             List<ItemStack> stacks = entry.getValue();
-            for (int i = 0; i < stacks.size(); i++) {
-                if (i > 0) {
-                    sb.append(",");
-                }
-                // Escape quotes in the NBT string before wrapping in JSON quotes
-                String nbtString = InventorySerializer.serializeItemStack(stacks.get(i));
-                String escapedNbtString = nbtString.replace("\"", "\\\"");
-                sb.append("\"").append(escapedNbtString).append("\"");
-            }
-            sb.append("]");
+            String serializedStacks = InventorySerializer.serializeItemListToString(stacks);
+            sb.append("\"").append(serializedStacks.replace("\"", "\\\"")).append("\"");
         }
         
         sb.append("}");
@@ -424,34 +426,30 @@ public class CuriosIntegration {
                     return curiosSlots;
                 }
                 
+                // Split by slot types - look for pattern "slotname":"data"
                 String[] pairs = content.split(",(?=\")");
                 for (String pair : pairs) {
-                    String[] keyValue = pair.split("\":\\[", 2);
+                    String[] keyValue = pair.split("\":", 2);
                     if (keyValue.length == 2) {
                         String slotType = keyValue[0].substring(1); // Remove leading quote
                         String stacksData = keyValue[1];
-                        if (stacksData.endsWith("]")) {
-                            stacksData = stacksData.substring(0, stacksData.length() - 1);
-                        }
                         
-                        List<ItemStack> stacks = new ArrayList<>();
-                        if (!stacksData.trim().isEmpty()) {
-                            String[] stackArray = stacksData.split("\",\"");
-                            for (String stackStr : stackArray) {
-                                // Remove quotes and unescape the NBT string
-                                String cleanStackStr = stackStr.replace("\"", "");
-                                String unescapedNbtString = cleanStackStr.replace("\\\"", "\"");
-                                ItemStack stack = InventorySerializer.deserializeItemStack(unescapedNbtString);
-                                stacks.add(stack);
-                            }
+                        // Remove surrounding quotes and unescape
+                        if (stacksData.startsWith("\"") && stacksData.endsWith("\"")) {
+                            stacksData = stacksData.substring(1, stacksData.length() - 1);
                         }
+                        stacksData = stacksData.replace("\\\"", "\"");
                         
-                        curiosSlots.put(slotType, stacks);
+                        // Use InventorySerializer to deserialize the NBT data
+                        List<ItemStack> stacks = InventorySerializer.deserializeStringToList(stacksData);
+                        if (!stacks.isEmpty()) {
+                            curiosSlots.put(slotType, stacks);
+                        }
                     }
                 }
             }
         } catch (Exception e) {
-            LOGGER.error("Failed to deserialize Curios data: {}", e.getMessage());
+            LOGGER.error("Failed to deserialize Curios data: {}", e.getMessage(), e);
         }
         
         return curiosSlots;
