@@ -129,15 +129,15 @@ public class ViewCommand {
         switch (section.toLowerCase()) {
             case "main":
                 items = InventorySerializer.deserializeStringToList(viewerData.backupEntry.inventoryMain());
-                displayName = "Main Inventory";
+                displayName = "Main Inventory (Unequipped Items)";
                 break;
             case "armor":
                 items = InventorySerializer.deserializeStringToList(viewerData.backupEntry.inventoryArmor());
-                displayName = "Armor";
+                displayName = "Armor Slots (Equipped Armor)";
                 break;
             case "offhand":
                 items = InventorySerializer.deserializeStringToList(viewerData.backupEntry.inventoryOffhand());
-                displayName = "Offhand";
+                displayName = "Offhand Slot (Equipped in Offhand)";
                 break;
             case "enderchest":
                 items = InventorySerializer.deserializeStringToList(viewerData.backupEntry.inventoryEnderChest());
@@ -146,7 +146,7 @@ public class ViewCommand {
             case "curios":
                 if (viewerData.backupEntry.inventoryCurios() != null && !viewerData.backupEntry.inventoryCurios().equals("{}")) {
                     items = getCuriosItems(viewerData.backupEntry.inventoryCurios());
-                    displayName = "Curios";
+                    displayName = "Curios Slots (Equipped Accessories)";
                 } else {
                     adminPlayer.sendSystemMessage(Component.literal("No Curios data found in this backup."));
                     return 0;
@@ -191,6 +191,25 @@ public class ViewCommand {
         adminPlayer.sendSystemMessage(Component.literal(String.format("Opened %s for %s (Backup #%d). Items: %d", 
             displayName, viewerData.playerName, viewerData.backupNumber, items.size())));
         
+        // Add section-specific explanatory messages
+        switch (section.toLowerCase()) {
+            case "main":
+                adminPlayer.sendSystemMessage(Component.literal("§7This shows items that were in the player's main inventory (unequipped)."));
+                break;
+            case "armor":
+                adminPlayer.sendSystemMessage(Component.literal("§7This shows items that were equipped in armor slots."));
+                break;
+            case "curios":
+                adminPlayer.sendSystemMessage(Component.literal("§7This shows items that were equipped in Curios accessory slots."));
+                break;
+            case "offhand":
+                adminPlayer.sendSystemMessage(Component.literal("§7This shows the item that was equipped in the offhand slot."));
+                break;
+            case "enderchest":
+                adminPlayer.sendSystemMessage(Component.literal("§7This shows items that were stored in the ender chest."));
+                break;
+        }
+        
         if (items.size() > 45) {
             adminPlayer.sendSystemMessage(Component.literal("§6Warning: This section has " + items.size() + 
                 " items, but only showing first 45. Consider using commands for full access."));
@@ -230,45 +249,45 @@ public class ViewCommand {
         // Main inventory button
         ItemStack mainButton;
         if ("main".equals(currentSection)) {
-            mainButton = createCleanNavItem(Items.CHEST, Component.literal("§e► Main Inventory ◄§r\n§7Currently viewing"));
+            mainButton = createCleanNavItem(Items.CHEST, Component.literal("§e► Main Inventory ◄§r\n§7Currently viewing\n§7§oUnequipped items"));
         } else {
-            mainButton = createCleanNavItem(Items.CHEST, Component.literal("§aMain Inventory§r\n§6Click to switch!"));
+            mainButton = createCleanNavItem(Items.CHEST, Component.literal("§aMain Inventory§r\n§6Click to switch!\n§7§oUnequipped items"));
         }
         container.setItem(navRow, mainButton);
         
         // Armor button
         ItemStack armorButton;
         if ("armor".equals(currentSection)) {
-            armorButton = createCleanNavItem(Items.IRON_CHESTPLATE, Component.literal("§e► Armor ◄§r\n§7Currently viewing"));
+            armorButton = createCleanNavItem(Items.IRON_CHESTPLATE, Component.literal("§e► Armor Slots ◄§r\n§7Currently viewing\n§7§oEquipped armor"));
         } else {
-            armorButton = createCleanNavItem(Items.IRON_CHESTPLATE, Component.literal("§bArmor§r\n§6Click to switch!"));
+            armorButton = createCleanNavItem(Items.IRON_CHESTPLATE, Component.literal("§bArmor Slots§r\n§6Click to switch!\n§7§oEquipped armor"));
         }
         container.setItem(navRow + 1, armorButton);
         
         // Offhand button
         ItemStack offhandButton;
         if ("offhand".equals(currentSection)) {
-            offhandButton = createCleanNavItem(Items.SHIELD, Component.literal("§e► Offhand ◄§r\n§7Currently viewing"));
+            offhandButton = createCleanNavItem(Items.SHIELD, Component.literal("§e► Offhand Slot ◄§r\n§7Currently viewing\n§7§oEquipped in offhand"));
         } else {
-            offhandButton = createCleanNavItem(Items.SHIELD, Component.literal("§dOffhand§r\n§6Click to switch!"));
+            offhandButton = createCleanNavItem(Items.SHIELD, Component.literal("§dOffhand Slot§r\n§6Click to switch!\n§7§oEquipped in offhand"));
         }
         container.setItem(navRow + 2, offhandButton);
         
         // Ender chest button
         ItemStack enderButton;
         if ("enderchest".equals(currentSection)) {
-            enderButton = createCleanNavItem(Items.ENDER_CHEST, Component.literal("§e► Ender Chest ◄§r\n§7Currently viewing"));
+            enderButton = createCleanNavItem(Items.ENDER_CHEST, Component.literal("§e► Ender Chest ◄§r\n§7Currently viewing\n§7§oEnder chest storage"));
         } else {
-            enderButton = createCleanNavItem(Items.ENDER_CHEST, Component.literal("§5Ender Chest§r\n§6Click to switch!"));
+            enderButton = createCleanNavItem(Items.ENDER_CHEST, Component.literal("§5Ender Chest§r\n§6Click to switch!\n§7§oEnder chest storage"));
         }
         container.setItem(navRow + 3, enderButton);
         
         // Curios button (using a different item to avoid food stats)
         ItemStack curiosButton;
         if ("curios".equals(currentSection)) {
-            curiosButton = createCleanNavItem(Items.GOLD_INGOT, Component.literal("§e► Curios ◄§r\n§7Currently viewing"));
+            curiosButton = createCleanNavItem(Items.GOLD_INGOT, Component.literal("§e► Curios Slots ◄§r\n§7Currently viewing\n§7§oEquipped accessories"));
         } else {
-            curiosButton = createCleanNavItem(Items.GOLD_INGOT, Component.literal("§6Curios§r\n§6Click to switch!"));
+            curiosButton = createCleanNavItem(Items.GOLD_INGOT, Component.literal("§6Curios Slots§r\n§6Click to switch!\n§7§oEquipped accessories"));
         }
         container.setItem(navRow + 4, curiosButton);
         
