@@ -1,113 +1,178 @@
-# Elite Holograms
+# Elite Inventory Backups
 
-A lightweight and powerful Minecraft mod for creating and managing holographic displays in-game. Inspired by AdvancedHolograms, Elite Holograms offers robust features for Forge (1.19.2, 1.20.x) and NeoForge (1.21.1).
+A comprehensive Minecraft Forge mod that automatically backs up player inventories and data to protect against item loss. Features robust database support, modded inventory integration, and easy restoration commands.
 
 ## Features
 
-- Create persistent holograms that stay loaded across server restarts.
-- Manage multiple lines (add, insert, remove, set).
-- Position control (create at your location, teleport to holograms).
-- **Comprehensive built-in placeholder system** with server and player-specific variables, including `%player_rank%`.
-- **Advanced permission system** with support for LuckPerms, FTB Ranks, or operator (OP level 2) fallback.
-- Easy-to-use commands with **tab completion** and intuitive syntax.
-- Performance optimized for servers with **proper shutdown handling** and efficient hologram rendering.
-- Support for Minecraft 1.19.2 (Forge), 1.20.x (Forge), and 1.21.1 (NeoForge).
+- **Automatic Backups**: Create backups on player login, logout, and death events
+- **Database Support**: Choose between H2 (local file-based) or MySQL/MariaDB for storage
+- **Modded Integration**: Built-in support for popular mods like Curios, Sophisticated Backpacks, and more
+- **Sequential Backup System**: Numbered backups (1, 2, 3...) for easy management
+- **Comprehensive Data Storage**: Backs up main inventory, armor, offhand, ender chest, experience, position, and modded inventories
+- **Manual Backup Creation**: Create backups on-demand via commands
+- **Easy Restoration**: Restore any backup with simple commands
+- **Backup Limits**: Configurable maximum backups per player with automatic cleanup
+- **Permission System**: Supports LuckPerms and FTB Ranks with OP fallback
+- **View System**: Preview backup contents before restoring
 
-## Placeholder System
+## Backup Data Stored
 
-Elite Holograms includes a built-in placeholder system that updates in real-time. No external placeholder API is required.
-
-### Server Placeholders
-These show the same information for all players:
-- `%players%` - Current online player count.
-- `%maxplayers%` - Server maximum players.
-- `%tps%` - Server TPS (Ticks Per Second).
-- `%uptime%` - Server uptime in HH:MM:SS format.
-- `%memory%` - Memory usage in "used/max MB (percentage%)" format.
-- `%server_time%` - Real world time in HH:MM:SS format.
-
-### Player-Specific Placeholders
-These show different information for each player viewing the hologram:
-- `%player%` - Player's display name.
-- `%player_rank%` - Player's rank (from LuckPerms/FTB Ranks, or "OP"/"Player").
-- `%player_health%` - Current/max health (e.g., "20.0/20.0").
-- `%player_level%` - Experience level.
-- `%player_world%` - World name (Overworld/Nether/End/custom).
-- `%player_coords%` - X, Y, Z coordinates.
-- `%player_gamemode%` - Game mode (Creative/Survival/Adventure/Spectator).
-
-### Example Usage
-```
-/eh create welcome &bWelcome &f%player%&b to the server!
-/eh addline welcome &7Your rank: &e%player_rank%
-/eh addline welcome &7Players online: &a%players%&7/&a%maxplayers%
-/eh addline welcome &7Server TPS: &a%tps%
-```
+For each backup, the mod stores:
+- **Standard Inventories**: Main inventory (hotbar + storage), armor slots, offhand, ender chest
+- **Player Data**: Experience level/progress, position (world, x, y, z coordinates)
+- **Event Information**: Backup type (login/logout/death/manual), timestamp, cause of death (if applicable)
+- **Modded Inventories**: Curios items, Sophisticated Backpacks contents, and other supported mods
+- **Generic NBT**: Full player NBT data as fallback for unsupported mods
 
 ## Commands
 
-**Permissions:** Commands require either specific permission nodes (if using a supported permission mod like LuckPerms or FTB Ranks) or operator (OP level 2) status. See the "Permissions" section below or `PERMISSIONS.md` for details.
+All commands use the base `/eib` (Elite Inventory Backups) and require admin permissions.
 
-| Command                     | Description                                  | Permission Node Suffix |
-| --------------------------- | -------------------------------------------- | ---------------------- |
-| `/eh create <id> <text...>` | Create a new hologram at your location       | `.create`              |
-| `/eh list [page]`           | List all holograms on the server             | `.list`                |
-| `/eh delete <id>`           | Delete a hologram                            | `.delete`              |
-| `/eh addline <id> <text...>`| Add a line to a hologram                     | `.edit`                |
-| `/eh setline <id> <#> <text...>`| Change the text on a specific line         | `.edit`                |
-| `/eh removeline <id> <#>`   | Remove a line from a hologram                | `.edit`                |
-| `/eh insertline <id> <#> <text...>`| Insert a line at a specific position  | `.edit`                |
-| `/eh movehere <id>`         | Move a hologram to your current location     | `.edit` (as it modifies) |
-| `/eh near [page]`           | List nearby holograms                        | `.near`                |
-| `/eh reload`                | Reload holograms from storage                | `.admin`               |
-| `/eh teleport <id>`         | Teleport to a hologram                       | `.teleport`            |
-| `/eh copy <source_id> <new_id>`| Copy an existing hologram to a new one    | `.create` (as it creates) |
-| `/eh info <id>`             | Display information about a hologram         | `.info`                |
+| Command | Description | Example |
+|---------|-------------|---------|
+| `/eib backup <player>` | Create a manual backup for a player | `/eib backup Steve` |
+| `/eib list <player> [page]` | List all backups for a player | `/eib list Steve` |
+| `/eib view <player> <backup#> [section]` | View backup contents in GUI | `/eib view Steve 5 main` |
+| `/eib restore <player> <backup#> [section]` | Restore a backup (or specific section) | `/eib restore Steve 3` |
+| `/eib removeall <player>` | Remove all backups for a player | `/eib removeall Steve` |
 
-All commands support **tab completion** for hologram IDs and relevant parameters. The base permission is `eliteholograms`. For example, to use `/eh create`, a player would need `eliteholograms.create`.
+### Command Details
+
+#### View Sections
+When using `/eib view`, you can specify sections:
+- `main` - Main inventory (hotbar + storage slots)
+- `armor` - Armor slots (helmet, chestplate, leggings, boots)
+- `offhand` - Offhand slot
+- `enderchest` - Ender chest contents
+- `curios` - Curios items (if Curios mod is installed)
+
+#### Restore Sections
+The restore command supports the same sections as view. If no section is specified, all sections are restored.
+
+## Configuration
+
+Configuration file: `config/eliteinventorybackups/config.toml`
+
+### Database Settings
+
+```toml
+[database]
+    # Database type: "H2" (local file) or "MYSQL" (external server)
+    databaseType = "H2"
+    
+    [database.mysql]
+        mysqlHost = "localhost"
+        mysqlPort = 3306
+        mysqlDatabase = "elite_inventory_backups"
+        mysqlUsername = "eib_user"
+        mysqlPassword = "password"
+        mysqlUseSSL = false
+        mysqlExtraParams = "serverTimezone=UTC"
+```
+
+### Backup Settings
+
+```toml
+[retention]
+    # Maximum backups per player (0 = unlimited)
+    maxBackupsPerPlayer = 24
+
+[event_snapshots]
+    # Enable automatic backups
+    enableDeathSnapshots = true
+    enableLoginSnapshots = true
+    enableLogoutSnapshots = true
+
+[mod_integrations]
+    # Enable specific mod integrations
+    enableCuriosBackup = true
+    enableGenericNbtBackup = true
+    enableSophisticatedBackpacksBackup = true
+    enableIronBackpacksBackup = true
+    enableColytraBackup = true
+    autoDetectModdedInventories = true
+```
+
+## Database Options
+
+### H2 Database (Default)
+- **Pros**: No setup required, works out of the box
+- **Cons**: Single-server only, limited concurrent access
+- **Best for**: Single servers, testing, smaller communities
+- **Storage**: `config/eliteinventorybackups/data/inventorybackups.mv.db`
+
+### MySQL/MariaDB
+- **Pros**: Multi-server support, better performance, professional backup tools
+- **Cons**: Requires separate database server setup
+- **Best for**: Network servers, larger communities, production environments
+
+## Mod Integration
+
+### Supported Mods
+- **Curios**: Automatically backs up and restores rings, amulets, belts, and other curio items
+- **Sophisticated Backpacks**: Backs up backpack contents and upgrades
+- **Iron Backpacks**: Backs up backpack inventory
+- **Colytra**: Backs up elytra and chestplate combinations
+- **Generic NBT**: Fallback system for any mod that stores data in player NBT
+
+### Adding Custom Integrations
+The mod includes a generic NBT backup system that captures most modded data automatically. For specific mod support, integrations can be added to the `integration` package.
 
 ## Permissions
 
-Elite Holograms features a flexible permission system:
+Requires admin permissions for all commands. Supports:
 
-- **Supported Systems:** Automatically detects and integrates with LuckPerms and FTB Ranks.
-- **Fallback:** If no supported permission mod is found, commands default to requiring operator (OP level 2) status.
-- **Granular Nodes:** Assign specific permissions for different actions. The base node is `eliteholograms`.
-    - `eliteholograms.create` - Allows creation of holograms (`/eh create`, `/eh copy`).
-    - `eliteholograms.delete` - Allows deletion of holograms (`/eh delete`).
-    - `eliteholograms.edit` - Allows modification of existing holograms (`/eh addline`, `/eh setline`, `/eh removeline`, `/eh insertline`, `/eh movehere`).
-    - `eliteholograms.list` - Allows listing all holograms (`/eh list`).
-    - `eliteholograms.info` - Allows viewing detailed hologram information (`/eh info`).
-    - `eliteholograms.near` - Allows listing nearby holograms (`/eh near`).
-    - `eliteholograms.teleport` - Allows teleporting to holograms (`/eh teleport`).
-    - `eliteholograms.admin` - Allows administrative actions like `/eh reload`.
-- **Console & Command Blocks:** Always have full permission to execute hologram commands.
+- **LuckPerms**: `eliteinventorybackups.admin`
+- **FTB Ranks**: `eliteinventorybackups.admin`
+- **Vanilla**: OP level 2 (fallback)
 
-For a detailed guide on setting up permissions, please see `PERMISSIONS.md`.
+```bash
+# LuckPerms example
+/lp user <player> permission set eliteinventorybackups.admin true
+
+# FTB Ranks example
+/ftbranks permission add <rank> eliteinventorybackups.admin
+```
+
+Console and command blocks always have full access.
 
 ## Installation
 
-1. Download the latest version for your Minecraft version (Forge/NeoForge) from [CurseForge](https://www.curseforge.com/minecraft/mc-mods/elite-holograms) (link to be added).
-2. Place the JAR file in your server's `mods` folder.
-3. If using, ensure LuckPerms or FTB Ranks is installed for granular permissions.
-4. Restart the server.
-5. Use `/eh create` to start creating holograms!
+1. Download the appropriate version for your Minecraft/Forge version
+2. Place the JAR file in your server's `mods` folder
+3. (Optional) Install LuckPerms or FTB Ranks for better permission management
+4. Start the server - configuration file will be created automatically
+5. Configure database settings if using MySQL
+6. Use `/eib backup <player>` to test the system
 
 ## Performance
 
-- Optimized background thread management for placeholder updates and hologram visibility.
-- Proper server shutdown handling to prevent hanging and ensure data is saved.
-- Efficient placeholder processing with robust error handling.
-- Memory-conscious hologram rendering.
-- Improved hologram entity synchronization for smoother multiplayer visibility, especially on NeoForge 1.21.1.
+- **Optimized Database Access**: Connection pooling and prepared statements
+- **Shutdown Protection**: Prevents hanging during server shutdown
+- **Backup Limits**: Automatic cleanup of old backups to prevent database bloat
+- **Efficient Serialization**: Optimized NBT/JSON serialization for large inventories
+- **Background Processing**: Non-blocking backup operations
 
 ## Version Support
 
-- **Forge19**: Minecraft 1.19.2 (EliteHolograms version `1.19.2-1.0.3`)
-- **Forge20**: Minecraft 1.20.x (EliteHolograms version `1.20.x-1.0.3`)
-- **Neo21**: Minecraft 1.21.1 (EliteHolograms version `1.21.1-1.0.2`)
+- **Forge 1.19.2**: Fully supported
+- **Forge 1.20.x**: Planned support
+- **NeoForge 1.21.1**: Planned support
 
-All versions aim for feature parity, including the advanced permission system and full placeholder support.
+## Troubleshooting
+
+### Common Issues
+- **Database Connection Errors**: Check MySQL credentials and server availability
+- **Permission Denied**: Ensure proper permission setup or OP status
+- **Backup Not Creating**: Check config settings and server logs
+- **Restoration Fails**: Verify backup exists and player is online
+
+### MySQL Timezone Error
+If you see timezone-related errors:
+```toml
+mysqlExtraParams = "serverTimezone=UTC"
+```
+Replace with your server's timezone (e.g., "America/New_York", "Europe/London").
 
 ## License
 
