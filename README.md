@@ -6,7 +6,7 @@ A comprehensive Minecraft Forge mod that automatically backs up player inventori
 
 - **Automatic Backups**: Create backups on player login, logout, and death events
 - **Database Support**: Choose between H2 (local file-based) or MySQL/MariaDB for storage
-- **Modded Integration**: Built-in support for popular mods like Curios, Sophisticated Backpacks, and more
+- **Modded Integration**: Built-in support for popular mods like Curios
 - **Sequential Backup System**: Numbered backups (1, 2, 3...) for easy management
 - **Comprehensive Data Storage**: Backs up main inventory, armor, offhand, ender chest, experience, position, and modded inventories
 - **Manual Backup Creation**: Create backups on-demand via commands
@@ -21,7 +21,7 @@ For each backup, the mod stores:
 - **Standard Inventories**: Main inventory (hotbar + storage), armor slots, offhand, ender chest
 - **Player Data**: Experience level/progress, position (world, x, y, z coordinates)
 - **Event Information**: Backup type (login/logout/death/manual), timestamp, cause of death (if applicable)
-- **Modded Inventories**: Curios items, Sophisticated Backpacks contents, and other supported mods
+- **Modded Inventories**: Curios items
 - **Generic NBT**: Full player NBT data as fallback for unsupported mods
 
 ## Commands
@@ -87,9 +87,6 @@ Configuration file: `config/eliteinventorybackups/config.toml`
     # Enable specific mod integrations
     enableCuriosBackup = true
     enableGenericNbtBackup = true
-    enableSophisticatedBackpacksBackup = true
-    enableIronBackpacksBackup = true
-    enableColytraBackup = true
     autoDetectModdedInventories = true
 ```
 
@@ -110,9 +107,6 @@ Configuration file: `config/eliteinventorybackups/config.toml`
 
 ### Supported Mods
 - **Curios**: Automatically backs up and restores rings, amulets, belts, and other curio items
-- **Sophisticated Backpacks**: Backs up backpack contents and upgrades
-- **Iron Backpacks**: Backs up backpack inventory
-- **Colytra**: Backs up elytra and chestplate combinations
 - **Generic NBT**: Fallback system for any mod that stores data in player NBT
 
 ### Adding Custom Integrations
