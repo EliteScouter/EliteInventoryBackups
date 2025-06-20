@@ -22,9 +22,6 @@ public class ModConfig {
         // Mod Integration Settings
         public final ForgeConfigSpec.BooleanValue enableCuriosBackup;
         public final ForgeConfigSpec.BooleanValue enableGenericNbtBackup;
-        public final ForgeConfigSpec.BooleanValue enableSophisticatedBackpacksBackup;
-        public final ForgeConfigSpec.BooleanValue enableIronBackpacksBackup;
-        public final ForgeConfigSpec.BooleanValue enableColytraBackup;
         public final ForgeConfigSpec.BooleanValue autoDetectModdedInventories;
 
         // Backup Retention Settings
@@ -96,18 +93,6 @@ public class ModConfig {
             enableGenericNbtBackup = builder
                 .comment("Enable generic NBT backup as fallback for unsupported mods. Captures full player data.")
                 .define("enableGenericNbtBackup", true);
-
-            enableSophisticatedBackpacksBackup = builder
-                .comment("Enable backup of Sophisticated Backpacks contents. Requires Sophisticated Backpacks mod.")
-                .define("enableSophisticatedBackpacksBackup", true);
-
-            enableIronBackpacksBackup = builder
-                .comment("Enable backup of Iron Backpacks contents. Requires Iron Backpacks mod.")
-                .define("enableIronBackpacksBackup", true);
-
-            enableColytraBackup = builder
-                .comment("Enable backup of Colytra items. Requires Colytra mod.")
-                .define("enableColytraBackup", true);
 
             autoDetectModdedInventories = builder
                 .comment("Automatically detect and backup modded inventories when possible.")
